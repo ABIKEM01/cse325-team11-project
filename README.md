@@ -14,4 +14,4 @@ Group project for CSE 325: .NET Software Development (BYU-Idaho). We are buildin
 Idea to be chosen by Week 3. Candidates are listed on our Trello board.
 
 ## Links
-- Trello: [board URL]
+- Trello: [https://trello.com/b/1RMCQ9qr/team-11-cse-325-project]
