@@ -1,0 +1,173 @@
+
+@page "/projects/{Id:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Web
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
+@using ServeTogether.Data
+@using ServeTogether.Models
+@using ServeTogether.Services
+
+@inject ApplicationDbContext Db
+@inject SignUpService SignUpService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Project Details</PageTitle>
+
+<h1>Project Details</h1>
+
+@if (isLoading)
+{
+    <p>Loading project...</p>
+}
+else if (project is null)
+{
+    <div class="alert alert-warning">
+        Project not found.
+    </div>
+}
+else
+{
+    <div class="card p-4 mb-4">
+        <h2>@project.Title</h2>
+        <p>@project.Description</p>
+        <p><strong>Location:</strong> @project.Location</p>
+        <p><strong>Date:</strong> @project.Date.ToString("D")</p>
+    </div>
+
+    <h3>Available Time Slots</h3>
+
+    @if (project.Slots.Count == 0)
+    {
+        <p>No time slots available.</p>
+    }
+    else
+    {
+        @foreach (var slot in project.Slots.OrderBy(s => s.StartTime))
+        {
+            var spotsLeft = slot.Capacity - slot.SignUps.Count;
+            var alreadySignedUp = userId is not null &&
+                slot.SignUps.Any(s => s.UserId == userId);
+
+            <div class="card p-3 mb-3">
+                <h4>
+                    @slot.StartTime.ToString("HH:mm") -
+                    @slot.EndTime.ToString("HH:mm")
+                </h4>
+
+                <p>
+                    <strong>Available spots:</strong>
+                    @spotsLeft / @slot.Capacity
+                </p>
+
+                @if (alreadySignedUp)
+                {
+                    <button class="btn btn-success" disabled>
+                        Already signed up
+                    </button>
+                }
+                else if (spotsLeft <= 0)
+                {
+                    <button class="btn btn-secondary" disabled>
+                        Full
+                    </button>
+                }
+                else if (userId is null)
+                {
+                    <a class="btn btn-primary"
+                       href="@($"/Account/Login?ReturnUrl={Uri.EscapeDataString($"/projects/{Id}")}")">
+                        Log in to sign up
+                    </a>
+                }
+                else
+                {
+                    <button class="btn btn-primary"
+                            disabled="@isSubmitting"
+                            @onclick="() => SignUp(slot.Id)">
+                        Sign up
+                    </button>
+                }
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrWhiteSpace(feedbackMessage))
+    {
+        <div class="alert @(feedbackSuccess ? "alert-success" : "alert-warning")"
+             role="alert">
+            @feedbackMessage
+        </div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private ServiceProject? project;
+    private string? userId;
+    private string? feedbackMessage;
+    private bool feedbackSuccess;
+    private bool isLoading = true;
+    private bool isSubmitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState =
+            await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            userId = authState.User.FindFirst(
+                ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        await LoadProject();
+    }
+
+    private async Task LoadProject()
+    {
+        isLoading = true;
+
+        project = await Db.ServiceProjects
+            .AsNoTracking()
+            .Include(p => p.Slots)
+                .ThenInclude(s => s.SignUps)
+            .FirstOrDefaultAsync(p => p.Id == Id);
+
+        isLoading = false;
+    }
+
+    private async Task SignUp(int slotId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            feedbackMessage = "Please log in to sign up.";
+            feedbackSuccess = false;
+            return;
+        }
+
+        isSubmitting = true;
+        feedbackMessage = null;
+
+        try
+        {
+            var result = await SignUpService.SignUpAsync(slotId, userId);
+
+            feedbackMessage = result.Message;
+            feedbackSuccess = result.Success;
+
+            await LoadProject();
+        }
+        catch (Exception)
+        {
+            feedbackMessage =
+                "Something went wrong. Please try again.";
+            feedbackSuccess = false;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

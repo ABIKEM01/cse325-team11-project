@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ServeTogether.Components;
 using ServeTogether.Components.Account;
 using ServeTogether.Data;
+using ServeTogether.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,9 @@ builder.Services.AddAuthentication(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
+
+builder.Services.AddScoped<SignUpService>();
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // CHANGED from template:
