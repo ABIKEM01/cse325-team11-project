@@ -1,0 +1,93 @@
+
+@page "/projects"
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using ServeTogether.Data
+@using ServeTogether.Models
+
+@inject ApplicationDbContext Db
+
+<PageTitle>Service Projects</PageTitle>
+
+<h1>Service Projects</h1>
+
+<p>Find an upcoming service project and choose a time to serve.</p>
+
+@if (isLoading)
+{
+    <p>Loading projects...</p>
+}
+else if (projects.Count == 0)
+{
+    <div class="alert alert-info">
+        There are no upcoming service projects at the moment.
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var project in projects)
+        {
+            var totalSpotsLeft = project.Slots.Sum(s => s.SpotsLeft);
+
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="card-title">@project.Title</h3>
+
+                        <p class="text-muted">
+                            @project.Date.ToString("D")
+                        </p>
+
+                        <p>
+                            <strong>Location:</strong>
+                            @project.Location
+                        </p>
+
+                        <p>
+                            <strong>Available spots:</strong>
+
+                            @if (project.Slots.Count == 0)
+                            {
+                                <span>No time slots posted</span>
+                            }
+                            else if (totalSpotsLeft <= 0)
+                            {
+                                <span class="text-danger">Full</span>
+                            }
+                            else
+                            {
+                                <span>@totalSpotsLeft spots left</span>
+                            }
+                        </p>
+
+                        <a class="btn btn-primary"
+                           href="@($"/projects/{project.Id}")">
+                            View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<ServiceProject> projects = new();
+
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        projects = await Db.ServiceProjects
+            .AsNoTracking()
+            .Include(p => p.Slots)
+                .ThenInclude(s => s.SignUps)
+            .Where(p => p.Date >= DateTime.Today)
+            .OrderBy(p => p.Date)
+            .ToListAsync();
+
+        isLoading = false;
+    }
+}
